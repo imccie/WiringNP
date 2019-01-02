@@ -1,3 +1,135 @@
+##wiringPI 适配 armbian
+Armbian就不多介绍了，其适用性很高，尤其在log方面，其使用的基于ram方式能大大延长tf卡的使用寿命。
+但是，由于armbian和官方固件编译过程并不一致，导致wiringPI程序无法兼容armbian。执行gpio readall后会出现无法识别的错误。
+
+经过研究，找出了一个方法，让wiringPI能够很好的在armbian上正常运行。
+
+**注意**：以下方法只适用于nanopi neo2
+
+首先在```/etc```下新建一个文件：```nanopi.info```
+
+文件内容为：
+```
+root@nanopineo2:/home/WiringNP# cat /etc/nanopi.info 
+processor       : 0
+BogoMIPS        : 48.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 4
+
+processor       : 1
+BogoMIPS        : 48.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 4
+
+processor       : 2
+BogoMIPS        : 48.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 4
+
+processor       : 3
+BogoMIPS        : 48.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 4
+
+Hardware        : Allwinnersun50iw2Family
+Revision        : 0000
+Serial          : 0000000000000000
+
+sunxi_platform    : Sun8iw7p1/Sun50iw2p1
+sunxi_secure      : normal
+sunxi_chipid      : unsupported
+sunxi_chiptype    : unsupported
+sunxi_batchno     : unsupported
+sunxi_board_id    : 1(0)
+board_manufacturer: FriendlyElec
+board_name        : FriendlyElec NanoPi-NEO2
+```
+
+修改boardtype_friendlyelec.c文件内容：
+修改函数getFieldValueInCpuInfo：
+```
+    if (!(f = fopen("/sys/devices/platform/board/info", "r"))) {
+        //if (!(f = fopen("/proc/cpuinfo", "r"))) {
+          if (!(f = fopen("/etc/nanopi.info", "r"))) { 
+           LOGE("open /proc/cpuinfo failed.");
+            return -1;
+        }
+    }
+```
+修改函数getAllwinnerBoardID：
+```
+    //if (!(f = fopen("/sys/class/sunxi_info/sys_info", "r"))) { 
+    if (!(f = fopen("/etc/nanopi.info", "r"))) { 
+        LOGE("open nanopi.info failed.");
+        return -1;
+    }
+```
+
+至此，可在armbian上运行gpio readall了
+
+```
+ gpio readall
+ +-----+-----+----------+------+---+-NanoPi-NEO2--+------+----------+-----+-----+
+ | BCM | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | BCM |
+ +-----+-----+----------+------+---+----++----+---+------+----------+-----+-----+
+ |     |     |     3.3V |      |   |  1 || 2  |   |      | 5V       |     |     |
+ |  12 |   8 |  GPIOA12 | ALT5 | 0 |  3 || 4  |   |      | 5V       |     |     |
+ |  11 |   9 |  GPIOA11 | ALT5 | 0 |  5 || 6  |   |      | 0v       |     |     |
+ | 203 |   7 |  GPIOG11 |  OFF | 0 |  7 || 8  | 0 |  OFF | GPIOG6   | 15  | 198 |
+ |     |     |       0v |      |   |  9 || 10 | 0 |  OFF | GPIOG7   | 16  | 199 |
+ |   0 |   0 |   GPIOA0 | ALT2 | 0 | 11 || 12 | 0 |  OFF | GPIOA6   | 1   | 6   |
+ |   2 |   2 |   GPIOA2 | ALT2 | 0 | 13 || 14 |   |      | 0v       |     |     |
+ |   3 |   3 |   GPIOA3 | ALT2 | 0 | 15 || 16 | 0 |  OFF | GPIOG8   | 4   | 200 |
+ |     |     |     3.3v |      |   | 17 || 18 | 0 |  OFF | GPIOG9   | 5   | 201 |
+ |  64 |  12 |   GPIOC0 |  OFF | 0 | 19 || 20 |   |      | 0v       |     |     |
+ |  65 |  13 |   GPIOC1 |  OFF | 0 | 21 || 22 | 0 |  OFF | GPIOA1   | 6   | 1   |
+ |  66 |  14 |   GPIOC2 |  OFF | 0 | 23 || 24 | 0 |  OFF | GPIOC3   | 10  | 67  |
+ +-----+-----+----------+------+---+----++----+---+------+----------+-----+-----+
+ | BCM | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | BCM |
+ +-----+-----+----------+------+---+-NanoPi-NEO2--+------+----------+-----+-----+
+
+ +-----+----NanoPi-NEO2 USB/Audio-+----+
+ | BCM | wPi |   Name   | Mode | V | Ph |
+ +-----+-----+----------+------+---+----+
+ |     |     |       5V |      |   | 25 |
+ |     |     |  USB-DP1 |      |   | 26 |
+ |     |     |  USB-DM1 |      |   | 27 |
+ |     |     |  USB-DP2 |      |   | 28 |
+ |     |     |  USB-DM2 |      |   | 29 |
+ |     |     |    IR-RX |      |   | 30 |
+ |  17 |  19 |  GPIOA17 | ALT5 | 0 | 31 |
+ |     |     |  PCM/I2C |      |   | 32 |
+ |     |     |  PCM/I2C |      |   | 33 |
+ |     |     |  PCM/I2C |      |   | 34 |
+ |     |     |  PCM/I2C |      |   | 35 |
+ |     |     |       0V |      |   | 36 |
+ +-----+-----+----------+------+---+----+
+
+ +-----+----NanoPi-NEO2 Debug UART-+----+
+ | BCM | wPi |   Name   | Mode | V | Ph |
+ +-----+-----+----------+------+---+----+
+ |   4 |  17 |   GPIOA4 | ALT5 | 0 | 37 |
+ |   5 |  18 |   GPIOA5 | ALT5 | 0 | 38 |
+ +-----+-----+----------+------+---+----+
+```
+
+
 # WiringNP
 This is a GPIO access library for NanoPi. It is based on the WiringOP for Orange PI which is based on original WiringPi for Raspberry Pi.
 
