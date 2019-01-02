@@ -1,4 +1,4 @@
-##wiringPI 适配 armbian
+#wiringPI 适配 armbian
 Armbian就不多介绍了，其适用性很高，尤其在log方面，其使用的基于ram方式能大大延长tf卡的使用寿命。
 但是，由于armbian和官方固件编译过程并不一致，导致wiringPI程序无法兼容armbian。执行gpio readall后会出现无法识别的错误。
 
